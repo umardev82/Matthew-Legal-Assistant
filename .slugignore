@@ -1,9 +1,0 @@
-__pycache__/
-*.log
-*.sqlite3
-node_modules/
-venv/
-.env
-.cache/
-tmp/
-*.pdf
