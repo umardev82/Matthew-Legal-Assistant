@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from langchain_community.document_loaders import PyPDFLoader
@@ -37,10 +38,7 @@ qdrant = QdrantVectorStore(
     embedding=embed_model  # ✅ Pass embedding model
 )
 
-# Initialize the language model
-llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=openai_api_key, temperature=0)
-
-@app.route('/welcome')
+@app.route('/')
 def index():
     return '<h1>Welcome to Matthew Legal Assistant</h1>'
 
@@ -86,6 +84,7 @@ def ask():
     """Handles user queries by retrieving relevant embeddings from Qdrant and responding using GPT."""
     user_data = request.get_json()
     query = user_data.get("question")
+    model_name = user_data.get("model_name", "gpt-4o-mini")  # Default to gpt-4o-mini if not provided
 
     if not query:
         return jsonify({"error": "No question provided"}), 400
@@ -100,7 +99,36 @@ def ask():
         # Prepare context for GPT
         context = "\n\n".join([f"Page {doc.metadata['page_no']}:\n{doc.page_content}" for doc in relevant_docs])
         formatted_prompt = f"""
-        You are a professional legal assistant. Provide a clear, concise, and accurate response to the user's question based on the context provided. 
+        Role: You are a highly experienced family law attorney specializing in Ohio domestic relations law. 
+        Your task is to analyze the given legal fact pattern, identify relevant Ohio Revised Code sections, 
+        extract applicable case law from Baldwin’s Guide to Family Law and Domestic Relations, and provide a comprehensive legal analysis following the IRAC method (Issue, Rule, Analysis, Conclusion).
+
+        Instructions:
+        1. Understand the User’s Query:
+            • Identify the primary legal issue based on the fact pattern provided.
+            • If the query is unclear or lacks essential details, ask clarifying questions to refine the analysis.
+
+        2. Locate Relevant Ohio Revised Code (ORC) Sections:
+            • Search Baldwin’s Guide to identify and cite the most relevant ORC statutes related to the issue.
+            • Summarize the statutory provisions and explain their applicability to the fact pattern.
+
+        3. Extract Case Law and Annotations:
+            • Retrieve case squibs from Baldwin’s Guide that relate to the legal issue.
+            • Present case law in the following structured format:
+                • Case Citation: Case Name, Volume Reporter Page (Court Year)
+                • Holding: Summarize the court’s ruling, including direct quotes where applicable.
+                • Analysis: Explain the case’s reasoning and its relevance to the fact pattern.
+
+        4. Provide an IRAC-Based Legal Analysis:
+            • Issue: Clearly state the legal question that needs resolution.
+            • Rule: Identify the statutory and case law principles governing the issue.
+            • Analysis: Apply legal principles to the fact pattern, weigh arguments, distinguish relevant cases, and discuss counterarguments if applicable.
+            • Conclusion: Offer a well-reasoned conclusion based on the best interest of the child and applicable legal standards.
+
+        5. Consider Practical Implications and Additional Considerations:
+            • If relocation is involved, discuss potential impacts on custody modifications and visitation schedules.
+            • Mention any procedural requirements, such as the Notice of Intent to Relocate (ORC 3109.051(G)).
+            • Highlight any jurisdictional concerns under the Uniform Child Custody Jurisdiction and Enforcement Act (UCCJEA) for out-of-state moves.
 
         Context:
         {context}
@@ -108,8 +136,15 @@ def ask():
         Question:
         {query}
 
-        Answer should be to the point and summarized.
+        Output Structure:
+            • Relevant ORC Sections
+            • Case Law Citations & Holdings
+            • Full IRAC-Based Legal Analysis
+            • Clarifications & Additional Considerations
         """
+
+        # Initialize the language model with the selected model name
+        llm = ChatOpenAI(model_name=model_name, openai_api_key=openai_api_key, temperature=0)
 
         # Get response from GPT
         response = llm(formatted_prompt)
@@ -119,6 +154,7 @@ def ask():
             "response": response_text.strip(),
             "retrieved_documents": [doc.page_content for doc in relevant_docs],
             "formatted_prompt": formatted_prompt,
+            "model_used": model_name  # Return the selected model name
         })
 
     except Exception as e:
