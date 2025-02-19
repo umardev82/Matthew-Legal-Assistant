@@ -84,7 +84,7 @@ def ask():
     """Handles user queries by retrieving relevant embeddings from Qdrant and responding using GPT."""
     user_data = request.get_json()
     query = user_data.get("question")
-    model_name = user_data.get("model_name", "gpt-4o")  # Default to gpt-4o-mini if not provided
+    model_name = user_data.get("model_name", "gpt-4o")  # Default to gpt-4o if not provided
 
     if not query:
         return jsonify({"error": "No question provided"}), 400
